@@ -119,7 +119,7 @@ export type TokenOut = {
 
 export const api = {
   register: (data: { email: string; name: string; password: string }) =>
-    request<{ message: string; detail?: string }>("/auth/register", { method: "POST", body: data, auth: false }),
+    request<TokenOut>("/auth/register", { method: "POST", body: data, auth: false }),
 
   verifyOtp: (data: { email: string; code: string }) =>
     request<TokenOut>("/auth/verify-otp", { method: "POST", body: data, auth: false }),

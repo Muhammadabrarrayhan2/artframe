@@ -32,9 +32,6 @@ export default function LoginPage() {
             ? err.message
             : "Something went wrong";
       toast.error(msg);
-      if (err instanceof ApiError && msg.toLowerCase().includes("not verified")) {
-        router.push(`/verify?email=${encodeURIComponent(email)}`);
-      }
     } finally {
       setLoading(false);
     }

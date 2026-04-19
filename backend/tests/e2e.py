@@ -1,6 +1,6 @@
 """
 Full end-to-end test of the ArtFrame backend using FastAPI's TestClient.
-Exercises: register -> OTP -> verify -> me -> upload image -> list -> detail -> logout -> 401
+Exercises: register -> me -> upload image -> list -> detail -> logout -> 401 -> re-login
 """
 import os, io, sys, re, traceback
 from pathlib import Path
@@ -12,15 +12,6 @@ for p in ["artframe.db"]:
 import shutil
 if os.path.exists("storage"):
     shutil.rmtree("storage")
-
-# Capture printed OTP from the email service
-import app.services.otp_service as otp_svc
-captured_codes = []
-_orig_send = otp_svc.send_otp_email
-def _capture(to, name, code):
-    captured_codes.append(code)
-    _orig_send(to, name, code)
-otp_svc.send_otp_email = _capture
 
 from fastapi.testclient import TestClient
 from app.main import app
@@ -46,25 +37,16 @@ def _run(client):
         "email": "rayhan@example.com", "name": "Rayhan", "password": "SuperSecret123"
     })
     print("  ", pretty(r)); assert r.status_code == 201
-    assert captured_codes, "No OTP captured"
-    code = captured_codes[-1]
-    print(f"  Captured OTP: {code}")
-
-    print("\n[3] POST /auth/verify-otp")
-    r = client.post("/api/v1/auth/verify-otp", json={
-        "email": "rayhan@example.com", "code": code
-    })
-    print("  ", pretty(r)); assert r.status_code == 200
     token = r.json()["access_token"]
     print(f"  Token: {token[:32]}...")
 
     H = {"Authorization": f"Bearer {token}"}
 
-    print("\n[4] GET /auth/me")
+    print("\n[3] GET /auth/me")
     r = client.get("/api/v1/auth/me", headers=H)
     print("  ", pretty(r)); assert r.status_code == 200
 
-    print("\n[5] POST /media/upload (synthetic test image)")
+    print("\n[4] POST /media/upload (synthetic test image)")
     # Build a small 256x256 PNG in-memory
     img = Image.new("RGB", (256, 256), color=(120, 140, 180))
     for x in range(256):
@@ -87,19 +69,19 @@ def _run(client):
     prob = upload_json["analysis"]["ai_probability"]
     print(f"  media_id={media_id} verdict={verdict} ai_prob={prob}")
 
-    print("\n[6] GET /media/{id}")
+    print("\n[5] GET /media/{id}")
     r = client.get(f"/api/v1/media/{media_id}", headers=H)
     print("  ", pretty(r)); assert r.status_code == 200
 
-    print("\n[7] GET /media/stats/summary")
+    print("\n[6] GET /media/stats/summary")
     r = client.get("/api/v1/media/stats/summary", headers=H)
     print("  ", pretty(r)); assert r.status_code == 200
 
-    print("\n[8] GET /lab/styles")
+    print("\n[7] GET /lab/styles")
     r = client.get("/api/v1/lab/styles", headers=H)
     print("  ", pretty(r)); assert r.status_code == 200
 
-    print("\n[9] POST /lab/transform  (sketch)")
+    print("\n[8] POST /lab/transform  (sketch)")
     buf.seek(0)
     r = client.post(
         "/api/v1/lab/transform",
@@ -110,15 +92,15 @@ def _run(client):
     print("  ", pretty(r))
     assert r.status_code == 201, "transform failed"
 
-    print("\n[10] POST /auth/logout")
+    print("\n[9] POST /auth/logout")
     r = client.post("/api/v1/auth/logout", headers=H)
     print("  ", pretty(r)); assert r.status_code == 200
 
-    print("\n[11] GET /auth/me after logout  (expect 401)")
+    print("\n[10] GET /auth/me after logout  (expect 401)")
     r = client.get("/api/v1/auth/me", headers=H)
     print("  ", pretty(r)); assert r.status_code == 401
 
-    print("\n[12] POST /auth/login  (re-login)")
+    print("\n[11] POST /auth/login  (re-login)")
     r = client.post("/api/v1/auth/login", json={
         "email": "rayhan@example.com", "password": "SuperSecret123"
     })

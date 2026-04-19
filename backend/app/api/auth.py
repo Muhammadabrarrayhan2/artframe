@@ -11,16 +11,34 @@ from app.core.ratelimit import check_rate
 from app.models.user import User
 from app.models.session import UserSession
 from app.schemas.auth import (
-    RegisterIn, LoginIn, VerifyOTPIn, ResendOTPIn,
+    RegisterIn, LoginIn, VerifyOTPIn,
     TokenOut, UserOut, MessageOut,
 )
-from app.services.otp_service import create_otp_for_user, verify_otp, send_otp_email
+from app.services.otp_service import verify_otp
 from app.services.audit_service import log_action
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/register", response_model=MessageOut, status_code=201)
+async def create_session_token(user: User, request: Request, db: AsyncSession) -> TokenOut:
+    token = create_access_token(user.id)
+    jti = token_to_jti(token)
+    expires_at = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    db.add(UserSession(
+        user_id=user.id,
+        token_jti=jti,
+        user_agent=request.headers.get("user-agent", "")[:255],
+        ip_address=request.client.host if request.client else "",
+        expires_at=expires_at,
+    ))
+    await db.commit()
+    return TokenOut(
+        access_token=token,
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
+
+
+@router.post("/register", response_model=TokenOut, status_code=201)
 async def register(payload: RegisterIn, request: Request, db: AsyncSession = Depends(get_db)):
     check_rate(request, "register", limit=5, window_seconds=60)
 
@@ -31,45 +49,24 @@ async def register(payload: RegisterIn, request: Request, db: AsyncSession = Dep
             raise HTTPException(status.HTTP_409_CONFLICT, "Email is already registered")
         existing.name = payload.name
         existing.password_hash = hash_password(payload.password)
+        existing.is_verified = True
         await db.commit()
-        code = await create_otp_for_user(db, existing.id, "register")
-        delivery_mode = send_otp_email(existing.email, existing.name, code)
-        await log_action(db, "register_resend", existing.id, request, {"email": existing.email})
-        return MessageOut(
-            message="Verification code sent",
-            detail=(
-                "An existing unverified account was refreshed. Check your inbox."
-                if delivery_mode == "smtp"
-                else "An existing unverified account was refreshed. Email delivery is not active yet, so the code was written to backend logs."
-            ),
-        )
+        token_out = await create_session_token(existing, request, db)
+        await log_action(db, "register_existing", existing.id, request, {"email": existing.email})
+        return token_out
 
     user = User(
         email=payload.email.lower(),
         name=payload.name.strip(),
         password_hash=hash_password(payload.password),
-        is_verified=False,
+        is_verified=True,
     )
     db.add(user)
     await db.commit()
     await db.refresh(user)
 
-    code = await create_otp_for_user(db, user.id, "register")
-    delivery_mode = send_otp_email(user.email, user.name, code)
     await log_action(db, "register", user.id, request, {"email": user.email})
-
-    return MessageOut(
-        message=(
-            "Account created. Please verify your email with the OTP sent."
-            if delivery_mode == "smtp"
-            else "Account created. Email delivery is not active yet, so the OTP was written to backend logs."
-        ),
-        detail=(
-            f"Code expires in {settings.OTP_EXPIRE_MINUTES} minutes."
-            if delivery_mode == "smtp"
-            else f"Code expires in {settings.OTP_EXPIRE_MINUTES} minutes. Configure SMTP in deployment to deliver OTPs to user inboxes."
-        ),
-    )
+    return await create_session_token(user, request, db)
 
 
 @router.post("/verify-otp", response_model=TokenOut)
@@ -109,22 +106,9 @@ async def verify_otp_endpoint(payload: VerifyOTPIn, request: Request, db: AsyncS
 
 
 @router.post("/resend-otp", response_model=MessageOut)
-async def resend_otp(payload: ResendOTPIn, request: Request, db: AsyncSession = Depends(get_db)):
-    check_rate(request, "resend-otp", limit=3, window_seconds=60)
-
-    result = await db.execute(select(User).where(User.email == payload.email.lower()))
-    user = result.scalars().first()
-    delivery_mode = "smtp"
-    if user and not user.is_verified:
-        code = await create_otp_for_user(db, user.id, "register")
-        delivery_mode = send_otp_email(user.email, user.name, code)
-        await log_action(db, "resend_otp", user.id, request)
+async def resend_otp():
     return MessageOut(
-        message=(
-            "If the account exists and is unverified, a new code has been sent."
-            if delivery_mode == "smtp"
-            else "If the account exists and is unverified, a new code was written to backend logs because email delivery is not active yet."
-        )
+        message="Email verification is no longer required. You can sign in immediately after registering."
     )
 
 
@@ -143,34 +127,11 @@ async def login(payload: LoginIn, request: Request, db: AsyncSession = Depends(g
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Account is disabled")
 
     if not user.is_verified:
-        code = await create_otp_for_user(db, user.id, "register")
-        delivery_mode = send_otp_email(user.email, user.name, code)
-        raise HTTPException(
-            status.HTTP_403_FORBIDDEN,
-            (
-                "Email not verified. A new verification code has been sent."
-                if delivery_mode == "smtp"
-                else "Email not verified. Email delivery is not active yet, so the new verification code was written to backend logs."
-            ),
-        )
+        user.is_verified = True
+        await db.commit()
 
-    token = create_access_token(user.id)
-    jti = token_to_jti(token)
-    expires_at = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    db.add(UserSession(
-        user_id=user.id,
-        token_jti=jti,
-        user_agent=request.headers.get("user-agent", "")[:255],
-        ip_address=request.client.host if request.client else "",
-        expires_at=expires_at,
-    ))
-    await db.commit()
     await log_action(db, "login_success", user.id, request)
-
-    return TokenOut(
-        access_token=token,
-        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-    )
+    return await create_session_token(user, request, db)
 
 
 @router.post("/logout", response_model=MessageOut)

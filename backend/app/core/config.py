@@ -1,11 +1,18 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import List
 import json
+from pathlib import Path
+from typing import List
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+BASE_DIR = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+        env_file=BASE_DIR / ".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
     )
 
     APP_NAME: str = "ArtFrame"
@@ -33,10 +40,13 @@ class Settings(BaseSettings):
     OTP_LENGTH: int = 6
 
     EMAIL_ENABLED: bool = False
+    EMAIL_PROVIDER: str = "smtp"
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
+    SENDGRID_API_KEY: str = ""
+    SENDGRID_API_BASE_URL: str = "https://api.sendgrid.com/v3/mail/send"
     EMAIL_FROM: str = "noreply@artframe.local"
     EMAIL_FROM_NAME: str = "ArtFrame"
     SMTP_USE_TLS: bool = True

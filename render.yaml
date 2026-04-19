@@ -11,6 +11,14 @@ services:
         value: "False"
       - key: EMAIL_ENABLED
         value: "False"
+      - key: EMAIL_PROVIDER
+        value: sendgrid
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: EMAIL_FROM_NAME
+        value: ArtFrame
       - key: SECRET_KEY
         generateValue: true
       - key: DATABASE_URL

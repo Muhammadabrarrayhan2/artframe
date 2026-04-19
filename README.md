@@ -6,7 +6,7 @@ ArtFrame is a full-stack portfolio-grade web application:
 
 - **Backend** — FastAPI + async SQLAlchemy + PyTorch-free forensic ensemble (numpy + Pillow + OpenCV)
 - **Frontend** — Next.js 14 (App Router) + Tailwind + TypeScript, premium editorial dark aesthetic
-- **Auth** — JWT with server-side session revocation, email OTP verification, bcrypt hashing, audit logging
+- **Auth** — JWT with server-side session revocation, instant account activation, bcrypt hashing, audit logging
 - **Safety** — watermarked outputs, daily quotas, dual consent gates, zero identity-imitation features
 
 ---
@@ -41,7 +41,7 @@ python -m uvicorn app.main:app --reload
 
 The API is now on `http://127.0.0.1:8000`. Interactive docs: `http://127.0.0.1:8000/docs`.
 
-> **Dev email mode**: with `EMAIL_ENABLED=False` (default), all OTP codes are printed to the backend console. Look for a big `[DEV EMAIL]` block when you register.
+> **Dev email mode**: email delivery can use SendGrid or SMTP, with console fallback if provider config is incomplete.
 
 ### Frontend
 
@@ -54,7 +54,7 @@ cp .env.local.example .env.local
 npm run dev
 ```
 
-The app is now on `http://127.0.0.1:3000`. Register, verify with the OTP you see in the backend console, and you're in.
+The app is now on `http://127.0.0.1:3000`. Register and you'll be signed in immediately.
 
 ### Optional — run the end-to-end backend test
 
@@ -63,7 +63,7 @@ cd backend
 PYTHONPATH=. python tests/e2e.py
 ```
 
-This exercises: register → OTP → verify → me → upload image → analyze → list → stats → lab transform → logout → 401 → re-login, and prints each response.
+This exercises: register → me → upload image → analyze → list → stats → lab transform → logout → 401 → re-login, and prints each response.
 
 ---
 
@@ -117,7 +117,7 @@ artframe/
 ├── backend/
 │   ├── app/
 │   │   ├── api/              # FastAPI routers
-│   │   │   ├── auth.py       # register, verify-otp, login, logout, logout-all, me
+│   │   │   ├── auth.py       # register, login, logout, logout-all, me
 │   │   │   ├── media.py      # upload, list, get, delete, stats, file
 │   │   │   └── lab.py        # styles, quota, transform, download
 │   │   ├── core/
@@ -129,7 +129,7 @@ artframe/
 │   │   ├── models/           # User, OTPCode, UserSession, MediaFile, AnalysisResult, AuditLog
 │   │   ├── schemas/          # Pydantic DTOs
 │   │   ├── services/
-│   │   │   ├── otp_service.py     # generate/verify OTP, dev-console email
+│   │   │   ├── otp_service.py     # generate/verify OTP, SendGrid/SMTP delivery, console fallback
 │   │   │   └── audit_service.py   # structured audit logger
 │   │   ├── ml/
 │   │   │   ├── image_detector.py  # 6-signal forensic ensemble
@@ -147,7 +147,7 @@ artframe/
 │   │   │   ├── layout.tsx    # split editorial auth shell
 │   │   │   ├── register/
 │   │   │   ├── login/
-│   │   │   └── verify/       # 6-digit OTP input + resend cooldown
+│   │   │   └── verify/       # legacy route explaining verification is no longer needed
 │   │   ├── dashboard/        # stats + recent-uploads grid
 │   │   ├── upload/           # drag-and-drop analyzer
 │   │   ├── result/[id]/      # ScoreRing + signal breakdown + video timeline
@@ -176,10 +176,10 @@ Base URL: `http://127.0.0.1:8000/api/v1`
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| POST | `/auth/register` | — | Create account (email + name + password). Sends OTP. |
-| POST | `/auth/verify-otp` | — | Activate account with OTP; returns JWT + creates session row. |
-| POST | `/auth/resend-otp` | — | Request a new code. |
-| POST | `/auth/login` | — | Email + password → JWT. Fails 403 if unverified. |
+| POST | `/auth/register` | — | Create account and return JWT immediately. |
+| POST | `/auth/verify-otp` | — | Legacy OTP verification endpoint for older accounts. |
+| POST | `/auth/resend-otp` | — | Legacy helper that now explains OTP is no longer required. |
+| POST | `/auth/login` | — | Email + password → JWT. |
 | POST | `/auth/logout` | bearer | Revokes THIS session server-side. |
 | POST | `/auth/logout-all` | bearer | Revokes every active session for the user. |
 | GET | `/auth/me` | bearer | Current user profile. |
@@ -246,14 +246,12 @@ In `backend/.env`:
 
 ```
 EMAIL_ENABLED=True
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your@email.com
-SMTP_PASSWORD=app-password
+EMAIL_PROVIDER=sendgrid
+SENDGRID_API_KEY=your-sendgrid-api-key
 EMAIL_FROM=noreply@yourdomain.com
 ```
 
-If `EMAIL_ENABLED=False` or the SMTP creds are missing, OTP codes are always printed to the backend console (which is the default dev mode).
+`EMAIL_FROM` must be a verified sender in SendGrid. If `EMAIL_ENABLED=False`, or the selected provider is missing required credentials, email delivery falls back to the backend console instead.
 
 ### Production notes
 
@@ -269,7 +267,7 @@ The current MVP uses:
 
 - **Passwords**: bcrypt with 72-byte truncation guard
 - **JWT**: HS256 with per-token `jti` + `exp` + `iat`. Server-side session table (`user_sessions`) records `token_jti` (SHA-256 of the token), revocation flag, IP, user-agent, expiry. Logout sets `revoked=True` server-side, so even a copied token fails.
-- **OTP**: 6-digit numeric, expires in 10 minutes, max 5 failed attempts per code, invalidates previous codes per purpose
+- **Auth flow**: registration activates the account immediately and returns a JWT + session row
 - **Rate limiting**: per-IP per-action sliding window (register 5/min, verify-otp 10/min, login 10/min, resend-otp 3/min)
 - **Headers**: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store` on every authenticated response
 - **Audit log**: every auth action, every upload, every transformation recorded with IP + UA

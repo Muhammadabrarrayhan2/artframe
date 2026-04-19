@@ -50,8 +50,6 @@ async def get_current_user(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not found")
     if not user.is_active:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Account is disabled")
-    if not user.is_verified:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Email not verified")
 
     # Attach token to request for logout convenience
     request.state.token = token

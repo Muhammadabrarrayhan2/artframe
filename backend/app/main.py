@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from app.core.config import settings
 from app.core.database import init_db
 from app.api import auth, media, lab, lab_advanced, lab_gemini
+from app.services.otp_service import get_email_delivery_label
 
 
 @asynccontextmanager
@@ -15,7 +16,7 @@ async def lifespan(app: FastAPI):
     print(f"  {settings.APP_NAME} backend is up")
     print(f"  API:  http://127.0.0.1:8000{settings.API_V1_PREFIX}")
     print(f"  Docs: http://127.0.0.1:8000/docs")
-    print(f"  Dev email mode: {'ON (console)' if not settings.EMAIL_ENABLED else 'SMTP'}")
+    print(f"  Email delivery: {get_email_delivery_label()}")
     print("=" * 60)
     yield
 

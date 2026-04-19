@@ -6,9 +6,11 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { Mail, User, Lock, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
+import { useAuth } from "@/lib/auth-store";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const setToken = useAuth((s) => s.setToken);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
@@ -29,9 +31,10 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      await api.register({ email, name, password });
-      toast.success("Check your inbox for the verification code");
-      router.push(`/verify?email=${encodeURIComponent(email)}`);
+      const { access_token } = await api.register({ email, name, password });
+      await setToken(access_token);
+      toast.success("Account created");
+      router.replace("/dashboard");
     } catch (err) {
       const msg = err instanceof ApiError ? err.detail : "Something went wrong";
       toast.error(msg);
