@@ -1,4 +1,7 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+const RAW_API_URL = process.env.NEXT_PUBLIC_API_URL?.trim();
+const API_URL =
+  RAW_API_URL ||
+  (process.env.NODE_ENV === "development" ? "http://127.0.0.1:8000" : "");
 const API_PREFIX = "/api/v1";
 
 export class ApiError extends Error {
@@ -23,7 +26,27 @@ export function writeToken(token: string | null) {
 }
 
 export function buildBackendUrl(path: string) {
-  return new URL(path, `${API_URL}/`).toString();
+  const apiUrl = getApiUrl();
+  return new URL(path, `${apiUrl}/`).toString();
+}
+
+function getApiUrl() {
+  if (!API_URL) {
+    throw new Error("NEXT_PUBLIC_API_URL is not configured for this deployment.");
+  }
+
+  if (
+    typeof window !== "undefined" &&
+    window.location.hostname !== "localhost" &&
+    window.location.hostname !== "127.0.0.1" &&
+    /^(https?:\/\/)?(127\.0\.0\.1|localhost)(:\d+)?$/i.test(API_URL)
+  ) {
+    throw new Error(
+      "NEXT_PUBLIC_API_URL still points to localhost. Set it to your deployed backend URL."
+    );
+  }
+
+  return API_URL;
 }
 
 async function request<T>(
@@ -31,7 +54,8 @@ async function request<T>(
   opts: { method?: string; body?: any; headers?: Record<string, string>; form?: FormData; auth?: boolean } = {}
 ): Promise<T> {
   const { method = "GET", body, headers = {}, form, auth = true } = opts;
-  const url = `${API_URL}${API_PREFIX}${path}`;
+  const apiUrl = getApiUrl();
+  const url = `${apiUrl}${API_PREFIX}${path}`;
 
   const finalHeaders: Record<string, string> = { ...headers };
   if (auth) {
@@ -47,12 +71,19 @@ async function request<T>(
     finalBody = JSON.stringify(body);
   }
 
-  const res = await fetch(url, {
-    method,
-    headers: finalHeaders,
-    body: finalBody,
-    cache: "no-store",
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method,
+      headers: finalHeaders,
+      body: finalBody,
+      cache: "no-store",
+    });
+  } catch {
+    throw new Error(
+      `Cannot reach API at ${apiUrl}. Check NEXT_PUBLIC_API_URL and backend CORS settings.`
+    );
+  }
 
   const text = await res.text();
   let data: any;

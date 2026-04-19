@@ -8,7 +8,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppShell } from "@/components/AppShell";
 import { VerdictBadge } from "@/components/VerdictBadge";
 import { ScoreRing } from "@/components/ScoreRing";
-import { api, type MediaWithAnalysis } from "@/lib/api";
+import { api, buildBackendUrl, type MediaWithAnalysis } from "@/lib/api";
 import { cn, formatBytes, formatDate, pct } from "@/lib/utils";
 import { ArrowLeft, Trash2, Loader2, Image as ImageIcon, Video, Music, Info } from "lucide-react";
 
@@ -125,7 +125,7 @@ function ResultInner() {
             {m.media_type === "image" && !imgError ? (
               <div className="card overflow-hidden">
                 <img
-                  src={`${process.env.NEXT_PUBLIC_API_URL}/api/v1/media/${m.id}/file`}
+                  src={buildBackendUrl(`/api/v1/media/${m.id}/file`)}
                   alt={m.original_name}
                   className="w-full h-auto block"
                   onError={() => setImgError(true)}

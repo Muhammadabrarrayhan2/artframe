@@ -25,7 +25,12 @@ export default function LoginPage() {
       toast.success(`Welcome back`);
       router.replace("/dashboard");
     } catch (err) {
-      const msg = err instanceof ApiError ? err.detail : "Something went wrong";
+      const msg =
+        err instanceof ApiError
+          ? err.detail
+          : err instanceof Error
+            ? err.message
+            : "Something went wrong";
       toast.error(msg);
       if (err instanceof ApiError && msg.toLowerCase().includes("not verified")) {
         router.push(`/verify?email=${encodeURIComponent(email)}`);
