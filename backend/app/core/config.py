@@ -24,6 +24,7 @@ class Settings(BaseSettings):
         "http://localhost:3001",
         "http://127.0.0.1:3001",
     ]
+    CORS_ORIGIN_REGEX: str = ""
 
     STORAGE_PATH: str = "./storage"
     MAX_UPLOAD_SIZE_MB: int = 25
