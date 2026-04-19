@@ -1,0 +1,27 @@
+# Backend
+backend/venv/
+backend/.env
+backend/artframe.db
+backend/artframe.db-journal
+backend/storage/
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/.pytest_cache/
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local
+frontend/out/
+frontend/build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+/tmp/

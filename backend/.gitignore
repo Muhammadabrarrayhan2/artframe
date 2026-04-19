@@ -1,0 +1,8 @@
+venv/
+.env
+artframe.db
+artframe.db-journal
+storage/
+__pycache__/
+*.pyc
+.pytest_cache/
