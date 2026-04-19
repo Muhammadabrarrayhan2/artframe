@@ -33,11 +33,15 @@ async def register(payload: RegisterIn, request: Request, db: AsyncSession = Dep
         existing.password_hash = hash_password(payload.password)
         await db.commit()
         code = await create_otp_for_user(db, existing.id, "register")
-        send_otp_email(existing.email, existing.name, code)
+        delivery_mode = send_otp_email(existing.email, existing.name, code)
         await log_action(db, "register_resend", existing.id, request, {"email": existing.email})
         return MessageOut(
             message="Verification code sent",
-            detail="An existing unverified account was refreshed. Check your inbox (or console in dev).",
+            detail=(
+                "An existing unverified account was refreshed. Check your inbox."
+                if delivery_mode == "smtp"
+                else "An existing unverified account was refreshed. Email delivery is not active yet, so the code was written to backend logs."
+            ),
         )
 
     user = User(
@@ -51,12 +55,20 @@ async def register(payload: RegisterIn, request: Request, db: AsyncSession = Dep
     await db.refresh(user)
 
     code = await create_otp_for_user(db, user.id, "register")
-    send_otp_email(user.email, user.name, code)
+    delivery_mode = send_otp_email(user.email, user.name, code)
     await log_action(db, "register", user.id, request, {"email": user.email})
 
     return MessageOut(
-        message="Account created. Please verify your email with the OTP sent.",
-        detail=f"Code expires in {settings.OTP_EXPIRE_MINUTES} minutes.",
+        message=(
+            "Account created. Please verify your email with the OTP sent."
+            if delivery_mode == "smtp"
+            else "Account created. Email delivery is not active yet, so the OTP was written to backend logs."
+        ),
+        detail=(
+            f"Code expires in {settings.OTP_EXPIRE_MINUTES} minutes."
+            if delivery_mode == "smtp"
+            else f"Code expires in {settings.OTP_EXPIRE_MINUTES} minutes. Configure SMTP in deployment to deliver OTPs to user inboxes."
+        ),
     )
 
 
@@ -102,11 +114,18 @@ async def resend_otp(payload: ResendOTPIn, request: Request, db: AsyncSession = 
 
     result = await db.execute(select(User).where(User.email == payload.email.lower()))
     user = result.scalars().first()
+    delivery_mode = "smtp"
     if user and not user.is_verified:
         code = await create_otp_for_user(db, user.id, "register")
-        send_otp_email(user.email, user.name, code)
+        delivery_mode = send_otp_email(user.email, user.name, code)
         await log_action(db, "resend_otp", user.id, request)
-    return MessageOut(message="If the account exists and is unverified, a new code has been sent.")
+    return MessageOut(
+        message=(
+            "If the account exists and is unverified, a new code has been sent."
+            if delivery_mode == "smtp"
+            else "If the account exists and is unverified, a new code was written to backend logs because email delivery is not active yet."
+        )
+    )
 
 
 @router.post("/login", response_model=TokenOut)
@@ -125,10 +144,14 @@ async def login(payload: LoginIn, request: Request, db: AsyncSession = Depends(g
 
     if not user.is_verified:
         code = await create_otp_for_user(db, user.id, "register")
-        send_otp_email(user.email, user.name, code)
+        delivery_mode = send_otp_email(user.email, user.name, code)
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
-            "Email not verified. A new verification code has been sent.",
+            (
+                "Email not verified. A new verification code has been sent."
+                if delivery_mode == "smtp"
+                else "Email not verified. Email delivery is not active yet, so the new verification code was written to backend logs."
+            ),
         )
 
     token = create_access_token(user.id)

@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
     EMAIL_FROM: str = "noreply@artframe.local"
+    EMAIL_FROM_NAME: str = "ArtFrame"
+    SMTP_USE_TLS: bool = True
+    SMTP_USE_SSL: bool = False
 
     GEMINI_API_KEY: str = ""
 

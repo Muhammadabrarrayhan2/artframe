@@ -3,6 +3,7 @@ import string
 import smtplib
 from datetime import datetime, timedelta
 from email.message import EmailMessage
+from email.utils import formataddr
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 
@@ -59,10 +60,10 @@ async def verify_otp(db: AsyncSession, user_id: int, code: str, purpose: str = "
     return True, "OTP verified."
 
 
-def send_otp_email(to_email: str, name: str, code: str) -> None:
+def send_otp_email(to_email: str, name: str, code: str) -> str:
     """
-    Sends OTP via SMTP if EMAIL_ENABLED, otherwise prints it to console.
-    For dev, the console output is the intended flow.
+    Sends OTP via SMTP if configured, otherwise prints it to console.
+    Returns the delivery mode so callers can describe what happened.
     """
     subject = f"[{settings.APP_NAME}] Your verification code"
     body = (
@@ -72,25 +73,43 @@ def send_otp_email(to_email: str, name: str, code: str) -> None:
         f"If you didn't request this, you can safely ignore it.\n"
     )
 
-    if not settings.EMAIL_ENABLED or not settings.SMTP_HOST or not settings.SMTP_USER:
+    smtp_ready = (
+        settings.EMAIL_ENABLED
+        and bool(settings.SMTP_HOST.strip())
+        and bool(settings.SMTP_USER.strip())
+        and bool(settings.SMTP_PASSWORD.strip())
+    )
+
+    if not smtp_ready:
         print("\n" + "=" * 60)
         print(f"  [DEV EMAIL] To: {to_email}")
         print(f"  Subject: {subject}")
         print(f"  --- Body ---")
         print(body)
         print("=" * 60 + "\n")
-        return
+        return "console"
 
     msg = EmailMessage()
-    msg["From"] = settings.EMAIL_FROM
+    msg["From"] = formataddr((settings.EMAIL_FROM_NAME, settings.EMAIL_FROM))
     msg["To"] = to_email
     msg["Subject"] = subject
     msg.set_content(body)
     try:
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
-            server.starttls()
+        smtp_cls = smtplib.SMTP_SSL if settings.SMTP_USE_SSL else smtplib.SMTP
+        with smtp_cls(settings.SMTP_HOST, settings.SMTP_PORT, timeout=30) as server:
+            if settings.SMTP_USE_TLS and not settings.SMTP_USE_SSL:
+                server.ehlo()
+                server.starttls()
+                server.ehlo()
             server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
             server.send_message(msg)
+        return "smtp"
     except Exception as e:
         print(f"[WARN] SMTP send failed: {e}. Falling back to console.")
+        print("\n" + "=" * 60)
+        print(f"  [FALLBACK EMAIL] To: {to_email}")
+        print(f"  Subject: {subject}")
+        print(f"  --- Body ---")
         print(body)
+        print("=" * 60 + "\n")
+        return "console_fallback"
