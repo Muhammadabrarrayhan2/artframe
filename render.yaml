@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: artframe
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    plan: free
+    autoDeploy: true
+    envVars:
+      - key: DEBUG
+        value: "False"
+      - key: EMAIL_ENABLED
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        value: sqlite+aiosqlite:///./artframe.db
+      - key: STORAGE_PATH
+        value: ./storage
+      - key: CORS_ORIGINS
+        sync: false
+
+  - type: web
+    name: artframe-frontend
+    runtime: node
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    startCommand: npm run start -- --hostname 0.0.0.0 --port $PORT
+    plan: free
+    autoDeploy: true
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        sync: false
