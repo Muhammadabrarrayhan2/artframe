@@ -15,27 +15,27 @@ export default function VerifyPage() {
 function VerifyInner() {
   return (
     <div className="animate-fade-up">
-      <div className="label mb-3">Verification Removed</div>
+      <div className="label mb-3">Verification In Popup</div>
       <h1 className="text-display text-4xl tracking-[-0.02em] text-ink-primary leading-[1.05]">
-        You can sign in <span className="italic text-accent-amber">right away.</span>
+        Verification now happens <span className="italic text-accent-amber">inside the auth popup.</span>
       </h1>
       <p className="mt-4 text-sm text-ink-secondary">
-        Email OTP verification is no longer required. New accounts become active immediately after registration.
+        Registration and reset password now show a popup code directly in the web flow, then the user types that code to continue.
       </p>
 
       <div className="mt-8 rounded-2xl border border-border bg-bg-inset/60 p-5 text-sm text-ink-secondary">
         <div className="flex items-center gap-2 text-ink-primary">
           <CheckCircle2 className="h-4 w-4 text-signal-real" strokeWidth={1.8} />
-          Account access now starts immediately after register or login.
+          Use the code popup shown during registration or password reset.
         </div>
       </div>
 
       <div className="mt-8 space-y-3">
-        <Link href="/login" className="btn-primary w-full inline-flex items-center justify-center">
+        <Link href="/login" className="btn-primary inline-flex w-full items-center justify-center">
           Sign in
           <ArrowRight className="h-4 w-4" />
         </Link>
-        <Link href="/register" className="btn-secondary w-full inline-flex items-center justify-center">
+        <Link href="/register" className="btn-secondary inline-flex w-full items-center justify-center">
           Create account
         </Link>
       </div>

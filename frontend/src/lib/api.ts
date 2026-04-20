@@ -117,18 +117,36 @@ export type TokenOut = {
   expires_in: number;
 };
 
+export type OTPChallengeOut = {
+  message: string;
+  email: string;
+  purpose: string;
+  otp_expires_minutes: number;
+  dev_code: string;
+  detail?: string | null;
+};
+
 export const api = {
   register: (data: { email: string; name: string; password: string }) =>
-    request<TokenOut>("/auth/register", { method: "POST", body: data, auth: false }),
+    request<OTPChallengeOut>("/auth/register", { method: "POST", body: data, auth: false }),
 
   verifyOtp: (data: { email: string; code: string }) =>
     request<TokenOut>("/auth/verify-otp", { method: "POST", body: data, auth: false }),
 
   resendOtp: (email: string) =>
-    request<{ message: string }>("/auth/resend-otp", { method: "POST", body: { email }, auth: false }),
+    request<OTPChallengeOut>("/auth/resend-otp", { method: "POST", body: { email }, auth: false }),
 
   login: (data: { email: string; password: string }) =>
     request<TokenOut>("/auth/login", { method: "POST", body: data, auth: false }),
+
+  requestForgotPasswordOtp: (email: string) =>
+    request<OTPChallengeOut>("/auth/forgot-password/request", { method: "POST", body: { email }, auth: false }),
+
+  verifyForgotPasswordOtp: (data: { email: string; code: string }) =>
+    request<{ message: string }>("/auth/forgot-password/verify", { method: "POST", body: data, auth: false }),
+
+  forgotPassword: (data: { email: string; code: string; new_password: string }) =>
+    request<{ message: string }>("/auth/forgot-password", { method: "POST", body: data, auth: false }),
 
   logout: () => request<{ message: string }>("/auth/logout", { method: "POST" }),
 
@@ -171,7 +189,6 @@ export const api = {
   },
 
   // --- Lab Advanced ---
-  // Voice transformation
   voicePresets: () => request<VoicePresetsOut>("/lab-advanced/voice-presets"),
   transformVoice: (
     file: File,
@@ -189,7 +206,6 @@ export const api = {
     return request<AdvancedTransformOut>("/lab-advanced/voice-transform", { method: "POST", form });
   },
 
-  // Video transformation
   videoPresets: () => request<VideoPresetsOut>("/lab-advanced/video-presets"),
   transformVideo: (
     file: File,
