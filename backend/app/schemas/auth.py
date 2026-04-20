@@ -1,5 +1,6 @@
-from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
+
+from pydantic import BaseModel, EmailStr, Field
 
 
 class RegisterIn(BaseModel):
@@ -11,6 +12,26 @@ class RegisterIn(BaseModel):
 class LoginIn(BaseModel):
     email: EmailStr
     password: str
+
+
+class OTPChallengeOut(BaseModel):
+    message: str
+    email: EmailStr
+    purpose: str
+    otp_expires_minutes: int
+    dev_code: str
+    detail: str | None = None
+
+
+class ForgotPasswordIn(BaseModel):
+    email: EmailStr
+    code: str = Field(min_length=4, max_length=10)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class ForgotPasswordVerifyIn(BaseModel):
+    email: EmailStr
+    code: str = Field(min_length=4, max_length=10)
 
 
 class VerifyOTPIn(BaseModel):
