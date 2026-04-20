@@ -70,6 +70,16 @@ async def create_otp_for_user(db: AsyncSession, user_id: int, purpose: str = "re
 
 
 async def verify_otp(db: AsyncSession, user_id: int, code: str, purpose: str = "register") -> tuple[bool, str]:
+    return await check_otp(db, user_id, code, purpose, consume=True)
+
+
+async def check_otp(
+    db: AsyncSession,
+    user_id: int,
+    code: str,
+    purpose: str = "register",
+    consume: bool = False,
+) -> tuple[bool, str]:
     result = await db.execute(
         select(OTPCode)
         .where(
@@ -90,8 +100,9 @@ async def verify_otp(db: AsyncSession, user_id: int, code: str, purpose: str = "
         otp.attempts += 1
         await db.commit()
         return False, "Invalid OTP code."
-    otp.used = True
-    await db.commit()
+    if consume:
+        otp.used = True
+        await db.commit()
     return True, "OTP verified."
 
 
