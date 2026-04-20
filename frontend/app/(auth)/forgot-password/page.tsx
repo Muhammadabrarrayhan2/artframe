@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
@@ -9,6 +9,14 @@ import { AuthCodePopup } from "@/components/AuthCodePopup";
 import { api, ApiError, type OTPChallengeOut } from "@/lib/api";
 
 export default function ForgotPasswordPage() {
+  return (
+    <Suspense fallback={<div className="h-24" />}>
+      <ForgotPasswordContent />
+    </Suspense>
+  );
+}
+
+function ForgotPasswordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams.get("email")?.trim() || "";
@@ -168,7 +176,12 @@ export default function ForgotPasswordPage() {
               </div>
             </div>
 
-            <button type="button" onClick={requestVerificationCode} disabled={loading || !email} className="btn-primary w-full">
+            <button
+              type="button"
+              onClick={requestVerificationCode}
+              disabled={loading || !email}
+              className="btn-primary w-full"
+            >
               {loading ? "Preparing popup code..." : "Verify identity"}
               {!loading && <ArrowRight className="h-4 w-4" />}
             </button>
