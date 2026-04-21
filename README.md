@@ -9,7 +9,7 @@ ArtFrame is a full-stack portfolio-grade web application:
 - **Auth** — JWT with server-side session revocation, instant account activation, bcrypt hashing, audit logging
 - **Safety** — watermarked outputs, daily quotas, dual consent gates, zero identity-imitation features
 
-Live demo : https://artframe-1da506hwl-muhammadabrarrayhan2s-projects.vercel.app/
+Live demo : https://artframe-ten.vercel.app/
 ---
 
 ## Table of contents
